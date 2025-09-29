@@ -11,6 +11,7 @@ def start(update, context):
 
 def main():
     # Твой токен бота
+    TOKEN = os.environ.get('BOT_TOKEN')
     
     # Создаем бота
     updater = Updater(TOKEN, use_context=True)
