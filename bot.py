@@ -2,7 +2,7 @@ import os
 import logging
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
@@ -16,13 +16,24 @@ logger = logging.getLogger(__name__)
 
 # Константы для типов событий
 EVENT_TYPES = {
-    'sleep': "Легла спать",
-    'wake_up': "Встала утром", 
-    'breakfast': "Завтрак",
-    'lunch': "Обед", 
-    'dinner': "Ужин",
-    'workout_start': "Начала тренировку",
-    'workout_end': "Закончила тренировку"
+    'sleep': "😴 Легла спать",
+    'wake_up': "🌅 Встала утром", 
+    'breakfast': "🍳 Завтрак",
+    'lunch': "🍲 Обед", 
+    'dinner': "🍽️ Ужин",
+    'workout_start': "💪 Начала тренировку",
+    'workout_end': "✅ Закончила тренировку"
+}
+
+# Символы для графиков
+GRAPH_SYMBOLS = {
+    'sleep': '😴',
+    'wake_up': '🌅', 
+    'breakfast': '🍳',
+    'lunch': '🍲',
+    'dinner': '🍽️',
+    'workout_start': '💪',
+    'workout_end': '✅'
 }
 
 class SleepTrackerBot:
@@ -33,13 +44,10 @@ class SleepTrackerBot:
     def _init_data_file(self):
         """Инициализация файла данных"""
         try:
-            # Если файла нет - создаем пустой
             if not os.path.exists(self.data_file):
                 with open(self.data_file, 'w', encoding='utf-8') as f:
                     json.dump([], f)
                 logger.info("✅ Файл данных инициализирован")
-            else:
-                logger.info("✅ Файл данных уже существует")
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации файла: {e}")
     
@@ -47,8 +55,11 @@ class SleepTrackerBot:
         """Сохранение события в файл"""
         try:
             # Читаем существующие данные
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                events = json.load(f)
+            if os.path.exists(self.data_file):
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    events = json.load(f)
+            else:
+                events = []
             
             # Добавляем новое событие
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -73,12 +84,13 @@ class SleepTrackerBot:
     def get_user_events(self, user_id):
         """Получение всех событий пользователя"""
         try:
+            if not os.path.exists(self.data_file):
+                return []
+                
             with open(self.data_file, 'r', encoding='utf-8') as f:
                 events = json.load(f)
             
-            # Фильтруем по user_id
             user_events = [e for e in events if e['user_id'] == user_id]
-            # Сортируем по времени
             user_events.sort(key=lambda x: x['timestamp'])
             
             return [(e['event_type'], e['timestamp']) for e in user_events]
@@ -87,12 +99,128 @@ class SleepTrackerBot:
             logger.error(f"❌ Ошибка получения событий: {e}")
             return []
     
+    def get_week_events(self, user_id):
+        """Получение событий за последние 7 дней"""
+        try:
+            week_ago = datetime.now() - timedelta(days=7)
+            all_events = self.get_user_events(user_id)
+            
+            week_events = []
+            for event_type, timestamp_str in all_events:
+                event_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                if event_time >= week_ago:
+                    week_events.append((event_type, timestamp_str))
+            
+            return week_events
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения событий за неделю: {e}")
+            return []
+    
+    def create_week_chart(self, user_id):
+        """Создание текстового графика за неделю"""
+        try:
+            week_events = self.get_week_events(user_id)
+            
+            if not week_events:
+                return "📊 За последнюю неделю событий не было"
+            
+            # Группируем события по дням
+            days_events = {}
+            for event_type, timestamp_str in week_events:
+                event_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                day_key = event_time.strftime('%Y-%m-%d')
+                day_name = event_time.strftime('%a')  # Сокр. название дня
+                
+                if day_key not in days_events:
+                    days_events[day_key] = {'name': day_name, 'events': []}
+                
+                time_str = event_time.strftime('%H:%M')
+                days_events[day_key]['events'].append((time_str, event_type))
+            
+            # Сортируем дни по дате
+            sorted_days = sorted(days_events.items())
+            
+            # Создаем график
+            chart = "📊 АКТИВНОСТЬ ЗА НЕДЕЛЮ:\n\n"
+            
+            for day_key, day_data in sorted_days[-7:]:  # Последние 7 дней
+                date_obj = datetime.strptime(day_key, '%Y-%m-%d')
+                date_str = date_obj.strftime('%d.%m')
+                
+                chart += f"📅 {date_str} ({day_data['name']}):\n"
+                
+                if day_data['events']:
+                    # Сортируем события по времени
+                    day_data['events'].sort()
+                    
+                    for time_str, event_type in day_data['events']:
+                        symbol = GRAPH_SYMBOLS.get(event_type, '•')
+                        name = EVENT_TYPES.get(event_type, 'Событие')
+                        chart += f"   {symbol} {time_str} - {name}\n"
+                else:
+                    chart += "   ─── событий не было ───\n"
+                
+                chart += "\n"
+            
+            # Статистика
+            total_events = len(week_events)
+            unique_days = len(days_events)
+            chart += f"📈 ИТОГО: {total_events} событий за {unique_days} дней"
+            
+            return chart
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка создания графика: {e}")
+            return "❌ Ошибка при создании графика"
+    
+    def create_hourly_chart(self, user_id):
+        """Создание графика по часам за неделю"""
+        try:
+            week_events = self.get_week_events(user_id)
+            
+            if not week_events:
+                return "⏰ За последнюю неделю событий не было"
+            
+            # Считаем события по часам
+            hourly_count = {i: 0 for i in range(24)}
+            
+            for event_type, timestamp_str in week_events:
+                event_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                hour = event_time.hour
+                hourly_count[hour] += 1
+            
+            # Создаем график
+            chart = "⏰ АКТИВНОСТЬ ПО ЧАСАМ (неделя):\n\n"
+            
+            max_count = max(hourly_count.values()) if hourly_count.values() else 1
+            
+            for hour in range(24):
+                count = hourly_count[hour]
+                # Создаем строку графика
+                bar_length = int((count / max_count) * 10) if max_count > 0 else 0
+                bar = '█' * bar_length
+                
+                hour_str = f"{hour:02d}:00"
+                chart += f"{hour_str} {bar} {count} событий\n"
+            
+            total_events = len(week_events)
+            most_active_hour = max(hourly_count, key=hourly_count.get) if hourly_count else "нет"
+            chart += f"\n📊 Всего событий: {total_events}"
+            chart += f"\n🎯 Самый активный час: {most_active_hour}:00"
+            
+            return chart
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка создания часового графика: {e}")
+            return "❌ Ошибка при создании графика"
+    
     def export_to_csv(self, user_id):
         """Экспорт событий в CSV"""
         try:
             events = self.get_user_events(user_id)
             
-            # Создаем CSV в памяти
+            # Создаем CSV в памяти как строку
             output = StringIO()
             writer = csv.writer(output)
             
@@ -104,7 +232,11 @@ class SleepTrackerBot:
                 description = EVENT_TYPES.get(event_type, 'Неизвестно')
                 writer.writerow([event_type, timestamp, description])
             
-            return output.getvalue()
+            # Возвращаем строку (не bytes!)
+            csv_string = output.getvalue()
+            output.close()
+            
+            return csv_string
             
         except Exception as e:
             logger.error(f"❌ Ошибка экспорта CSV: {e}")
@@ -124,8 +256,11 @@ def start(update, context):
 • Приемы пищи  
 • Тренировки
 
-🎯 Используй кнопки для записи!
-📥 /csv - скачать данные в CSV
+🎯 Команды:
+/start - показать кнопки
+/stats - статистика за неделю  
+/chart - график по часам
+/csv - скачать данные в CSV
 """
         
         keyboard = [
@@ -151,6 +286,38 @@ def start(update, context):
     except Exception as e:
         logger.error(f"❌ Ошибка в start: {e}")
 
+def stats_command(update, context):
+    """Обработчик команды /stats - статистика за неделю"""
+    try:
+        user_id = update.effective_user.id
+        chart = tracker.create_week_chart(user_id)
+        
+        # Разбиваем на части если слишком длинное сообщение
+        if len(chart) > 4000:
+            parts = [chart[i:i+4000] for i in range(0, len(chart), 4000)]
+            for part in parts:
+                update.message.reply_text(part)
+        else:
+            update.message.reply_text(chart)
+            
+        logger.info(f"✅ Пользователь {user_id} запросил статистику")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка в stats_command: {e}")
+        update.message.reply_text("❌ Ошибка при получении статистики")
+
+def chart_command(update, context):
+    """Обработчик команды /chart - график по часам"""
+    try:
+        user_id = update.effective_user.id
+        chart = tracker.create_hourly_chart(user_id)
+        update.message.reply_text(chart)
+        logger.info(f"✅ Пользователь {user_id} запросил часовой график")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка в chart_command: {e}")
+        update.message.reply_text("❌ Ошибка при создании графика")
+
 def csv_command(update, context):
     """Обработчик команды /csv - экспорт в CSV"""
     try:
@@ -161,11 +328,10 @@ def csv_command(update, context):
             update.message.reply_text("📝 У вас еще нет записанных событий.")
             return
         
-        # Создаем CSV
         csv_data = tracker.export_to_csv(user_id)
         
         if csv_data:
-            # Отправляем файл
+            # Кодируем в bytes только при отправке
             update.message.reply_document(
                 document=('events.csv', csv_data.encode('utf-8')),
                 caption="📊 Ваши данные в CSV формате"
@@ -188,14 +354,12 @@ def button_handler(update, context):
         event_type = query.data
         
         if event_type in EVENT_TYPES:
-            # Сохраняем событие
             timestamp = tracker.save_event(user_id, event_type)
             
             if timestamp:
                 event_time = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
                 formatted_time = event_time.strftime('%H:%M:%S')
                 
-                # Обновляем сообщение с кнопками
                 keyboard = [
                     [
                         InlineKeyboardButton("😴 Легла спать", callback_data='sleep'),
@@ -230,7 +394,6 @@ def error_handler(update, context):
 def main():
     """Основная функция"""
     try:
-        # Получаем токен из переменных окружения
         TOKEN = os.environ.get('BOT_TOKEN')
         
         if not TOKEN:
@@ -239,17 +402,16 @@ def main():
         
         logger.info("✅ Токен получен, запускаем бота...")
         
-        # Создаем бота
         updater = Updater(TOKEN, use_context=True)
         dp = updater.dispatcher
         
-        # Добавляем обработчики
         dp.add_handler(CommandHandler("start", start))
+        dp.add_handler(CommandHandler("stats", stats_command))
+        dp.add_handler(CommandHandler("chart", chart_command))
         dp.add_handler(CommandHandler("csv", csv_command))
         dp.add_handler(CallbackQueryHandler(button_handler))
         dp.add_error_handler(error_handler)
         
-        # Запускаем бота
         logger.info("✅ Бот запущен и работает! 🚀")
         updater.start_polling()
         updater.idle()
