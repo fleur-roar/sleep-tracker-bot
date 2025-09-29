@@ -1,7 +1,7 @@
 import os
 import logging
-import sqlite3
 import csv
+import json
 from datetime import datetime
 from io import StringIO
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,43 +27,45 @@ EVENT_TYPES = {
 
 class SleepTrackerBot:
     def __init__(self):
-        self.db_path = 'sleep_tracker.db'
-        self._init_db()
+        self.data_file = 'events_data.json'
+        self._init_data_file()
     
-    def _init_db(self):
-        """Инициализация базы данных"""
+    def _init_data_file(self):
+        """Инициализация файла данных"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    event_type TEXT,
-                    timestamp DATETIME
-                )
-            ''')
-            conn.commit()
-            conn.close()
-            logger.info("✅ База данных инициализирована")
+            # Если файла нет - создаем пустой
+            if not os.path.exists(self.data_file):
+                with open(self.data_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+                logger.info("✅ Файл данных инициализирован")
+            else:
+                logger.info("✅ Файл данных уже существует")
         except Exception as e:
-            logger.error(f"❌ Ошибка БД: {e}")
+            logger.error(f"❌ Ошибка инициализации файла: {e}")
     
     def save_event(self, user_id, event_type):
-        """Сохранение события в базу данных"""
+        """Сохранение события в файл"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Читаем существующие данные
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                events = json.load(f)
             
-            cursor.execute(
-                'INSERT INTO events (user_id, event_type, timestamp) VALUES (?, ?, ?)',
-                (user_id, event_type, timestamp)
-            )
-            conn.commit()
-            conn.close()
+            # Добавляем новое событие
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            new_event = {
+                'user_id': user_id,
+                'event_type': event_type,
+                'timestamp': timestamp
+            }
+            events.append(new_event)
+            
+            # Сохраняем обратно
+            with open(self.data_file, 'w', encoding='utf-8') as f:
+                json.dump(events, f, ensure_ascii=False, indent=2)
+            
             logger.info(f"✅ Событие сохранено: user={user_id}, type={event_type}")
             return timestamp
+            
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения: {e}")
             return None
@@ -71,15 +73,16 @@ class SleepTrackerBot:
     def get_user_events(self, user_id):
         """Получение всех событий пользователя"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute(
-                'SELECT event_type, timestamp FROM events WHERE user_id = ? ORDER BY timestamp',
-                (user_id,)
-            )
-            events = cursor.fetchall()
-            conn.close()
-            return events
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                events = json.load(f)
+            
+            # Фильтруем по user_id
+            user_events = [e for e in events if e['user_id'] == user_id]
+            # Сортируем по времени
+            user_events.sort(key=lambda x: x['timestamp'])
+            
+            return [(e['event_type'], e['timestamp']) for e in user_events]
+            
         except Exception as e:
             logger.error(f"❌ Ошибка получения событий: {e}")
             return []
@@ -102,6 +105,7 @@ class SleepTrackerBot:
                 writer.writerow([event_type, timestamp, description])
             
             return output.getvalue()
+            
         except Exception as e:
             logger.error(f"❌ Ошибка экспорта CSV: {e}")
             return ""
@@ -143,6 +147,7 @@ def start(update, context):
         
         update.message.reply_text(welcome_text, reply_markup=reply_markup)
         logger.info(f"✅ Пользователь {update.effective_user.id} запустил бота")
+        
     except Exception as e:
         logger.error(f"❌ Ошибка в start: {e}")
 
@@ -168,6 +173,7 @@ def csv_command(update, context):
             logger.info(f"✅ Пользователь {user_id} экспортировал CSV")
         else:
             update.message.reply_text("❌ Ошибка при создании CSV файла")
+            
     except Exception as e:
         logger.error(f"❌ Ошибка в csv_command: {e}")
         update.message.reply_text("❌ Ошибка при экспорте данных")
@@ -213,6 +219,7 @@ def button_handler(update, context):
                 )
             else:
                 query.edit_message_text("❌ Ошибка при сохранении события")
+                
     except Exception as e:
         logger.error(f"❌ Ошибка в button_handler: {e}")
 
