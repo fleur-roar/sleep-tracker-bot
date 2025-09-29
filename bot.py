@@ -50,8 +50,8 @@ class SleepTrackerBot:
             else:
                 events = []
             
-            # Добавляем новое событие
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Добавляем новое событие (UTC+3)
+            timestamp = (datetime.now() + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
             new_event = {
                 'user_id': user_id,
                 'event_type': event_type,
@@ -69,29 +69,29 @@ class SleepTrackerBot:
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения: {e}")
             return None
-    
-    def get_user_events(self, user_id):
-        """Получение всех событий пользователя"""
-        try:
-            if not os.path.exists(self.data_file):
-                return []
+        
+        def get_user_events(self, user_id):
+            """Получение всех событий пользователя"""
+            try:
+                if not os.path.exists(self.data_file):
+                    return []
+                    
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    events = json.load(f)
                 
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                events = json.load(f)
-            
-            user_events = [e for e in events if e['user_id'] == user_id]
-            user_events.sort(key=lambda x: x['timestamp'])
-            
-            return [(e['event_type'], e['timestamp']) for e in user_events]
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка получения событий: {e}")
-            return []
+                user_events = [e for e in events if e['user_id'] == user_id]
+                user_events.sort(key=lambda x: x['timestamp'])
+                
+                return [(e['event_type'], e['timestamp']) for e in user_events]
+                
+            except Exception as e:
+                logger.error(f"❌ Ошибка получения событий: {e}")
+                return []
     
     def get_week_events(self, user_id):
         """Получение событий за последние 7 дней"""
         try:
-            week_ago = datetime.now() - timedelta(days=7)
+            week_ago = datetime.now() + timedelta(hours=3) - timedelta(days=7)
             all_events = self.get_user_events(user_id)
             
             week_events = []
