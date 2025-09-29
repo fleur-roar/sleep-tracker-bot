@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 
 # Настройка логирования
 logging.basicConfig(
@@ -61,13 +61,10 @@ class SleepTrackerBot:
 # Инициализация бота
 tracker = SleepTrackerBot()
 
-# Токен бота (Railway будет использовать переменную окружения)
+# Токен бота
 TOKEN = os.environ.get('BOT_TOKEN', '7578614408:AAH2vKc9k0Y7q8vx1s7v8v8N9tN9tN9tN9t')
 
-# Создаем приложение
-application = Application.builder().token(TOKEN).build()
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def start(update: Update, context: CallbackContext):
     """Обработчик команды /start"""
     welcome_text = """
     👋 Привет! Я бот для отслеживания твоего распорядка дня.
@@ -97,13 +94,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    update.message.reply_text(welcome_text, reply_markup=reply_markup)
     logger.info(f"Пользователь {update.effective_user.id} запустил бота")
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def button_handler(update: Update, context: CallbackContext):
     """Обработчик нажатий на кнопки"""
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     user_id = query.from_user.id
     event_type = query.data
@@ -136,28 +133,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Отправляем подтверждение
-            await query.edit_message_text(
+            query.edit_message_text(
                 text=f"✅ {EVENT_TYPES[event_type]} записано в {formatted_time}",
                 reply_markup=reply_markup
             )
             
         except Exception as e:
             logger.error(f"Ошибка сохранения события: {e}")
-            await query.edit_message_text(
-                text="❌ Произошла ошибка при сохранении события",
-                reply_markup=reply_markup
+            query.edit_message_text(
+                text="❌ Произошла ошибка при сохранении события"
             )
 
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def error_handler(update: Update, context: CallbackContext):
     """Обработчик ошибок"""
     logger.error(f"Ошибка: {context.error}")
 
-# Добавляем обработчики
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CallbackQueryHandler(button_handler))
-application.add_error_handler(error_handler)
-
-# Запуск бота
-if __name__ == "__main__":
+def main():
+    """Основная функция"""
+    # Создаем Updater и передаем ему токен
+    updater = Updater(TOKEN, use_context=True)
+    
+    # Получаем диспетчер для регистрации обработчиков
+    dp = updater.dispatcher
+    
+    # Добавляем обработчики
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CallbackQueryHandler(button_handler))
+    dp.add_error_handler(error_handler)
+    
+    # Запускаем бота
     logger.info("Бот запускается...")
-    application.run_polling()
+    updater.start_polling()
+    
+    # Запускаем бота до тех пор, пока пользователь не остановит его
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
