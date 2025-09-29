@@ -1,7 +1,7 @@
 {
     "builds": [
         {
-            "src": "bot.py",
+            "src": ".",
             "use": "@railway-community/python"
         }
     ],
