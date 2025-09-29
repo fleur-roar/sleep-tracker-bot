@@ -1,5 +1,6 @@
-from telegram.ext import Updater, CommandHandler
+import os
 import logging
+from telegram.ext import Updater, CommandHandler
 
 # Включаем логирование
 logging.basicConfig(level=logging.INFO)
@@ -10,8 +11,15 @@ def start(update, context):
     update.message.reply_text("Привееет! 🎉")
 
 def main():
-    # Твой токен бота
+    # Получаем токен из переменных окружения
     TOKEN = os.environ.get('BOT_TOKEN')
+    
+    # Проверяем, что токен есть
+    if not TOKEN:
+        logger.error("❌ Токен не найден! Установи переменную BOT_TOKEN в настройках Railway")
+        return
+    
+    logger.info("✅ Токен получен, запускаем бота...")
     
     # Создаем бота
     updater = Updater(TOKEN, use_context=True)
@@ -20,7 +28,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler("start", start))
     
     # Запускаем бота
-    logger.info("Бот запускается...")
+    logger.info("Бот запущен и работает! 🚀")
     updater.start_polling()
     updater.idle()
 
