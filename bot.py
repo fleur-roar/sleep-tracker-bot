@@ -16,13 +16,15 @@ logger = logging.getLogger(__name__)
 
 # Константы для типов событий
 EVENT_TYPES = {
-    'sleep': "😴 Легла спать",
-    'wake_up': "🌅 Встала утром", 
-    'breakfast': "🍳 Завтрак",
-    'lunch': "🍲 Обед", 
-    'dinner': "🍽️ Ужин",
-    'workout_start': "💪 Начала тренировку",
-    'workout_end': "✅ Закончила тренировку"
+    'sleep': "🌌🌃 Легла спать",
+    'wake_up': "🌄🌅 Встала утром", 
+    'breakfast': "🍌 Завтрак",
+    'lunch': "🥩 Обед", 
+    'dinner': "🥛 Ужин",
+    'workout_start': "😁 Начала тренировку",
+    'workout_end': "✅ Закончила тренировку",
+    'smart_start': "📚 Начала учебу",
+    'smart_end': "🙏 Закончила учебу"
 }
 
 class SleepTrackerBot:
@@ -248,21 +250,26 @@ def start(update, context):
 /stats - статистика за неделю  
 /chart - график по часам
 /csv - скачать данные в CSV
+🍂🍁🌾🌹🥀🍄‍🟫
 """
         
         keyboard = [
             [
-                InlineKeyboardButton("😴 Легла спать", callback_data='sleep'),
-                InlineKeyboardButton("🌅 Встала утром", callback_data='wake_up')
+                InlineKeyboardButton("🌌🌃 Легла спать", callback_data='sleep'),
+                InlineKeyboardButton("🌄🌅 Встала утром", callback_data='wake_up')
             ],
             [
-                InlineKeyboardButton("🍳 Завтрак", callback_data='breakfast'),
-                InlineKeyboardButton("🍲 Обед", callback_data='lunch'), 
-                InlineKeyboardButton("🍽️ Ужин", callback_data='dinner')
+                InlineKeyboardButton("🍌 Завтрак", callback_data='breakfast'),
+                InlineKeyboardButton("🥩 Обед", callback_data='lunch'), 
+                InlineKeyboardButton("🥛 Ужин", callback_data='dinner')
             ],
             [
-                InlineKeyboardButton("💪 Начала тренировку", callback_data='workout_start'),
+                InlineKeyboardButton("😁 Начала тренировку", callback_data='workout_start'),
                 InlineKeyboardButton("✅ Закончила тренировку", callback_data='workout_end')
+            ],
+            [
+                InlineKeyboardButton("📚 Начала учебу", callback_data='smart_start'),
+                InlineKeyboardButton("🙏 Закончила учебу", callback_data='smart_end')
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -355,17 +362,21 @@ def button_handler(update, context):
                 
                 keyboard = [
                     [
-                        InlineKeyboardButton("😴 Легла спать", callback_data='sleep'),
-                        InlineKeyboardButton("🌅 Встала утром", callback_data='wake_up')
+                        InlineKeyboardButton("🌌🌃 Легла спать", callback_data='sleep'),
+                        InlineKeyboardButton("🌄🌅 Встала утром", callback_data='wake_up')
                     ],
                     [
-                        InlineKeyboardButton("🍳 Завтрак", callback_data='breakfast'),
-                        InlineKeyboardButton("🍲 Обед", callback_data='lunch'),
-                        InlineKeyboardButton("🍽️ Ужин", callback_data='dinner')
+                        InlineKeyboardButton("🍌 Завтрак", callback_data='breakfast'),
+                        InlineKeyboardButton("🥩 Обед", callback_data='lunch'),
+                        InlineKeyboardButton("🥛 Ужин", callback_data='dinner')
                     ],
                     [
-                        InlineKeyboardButton("💪 Начала тренировку", callback_data='workout_start'),
+                        InlineKeyboardButton("😁 Начала тренировку", callback_data='workout_start'),
                         InlineKeyboardButton("✅ Закончила тренировку", callback_data='workout_end')
+                    ],
+                    [
+                        InlineKeyboardButton("📚 Начала учебу", callback_data='smart_start'),
+                        InlineKeyboardButton("🙏 Закончила учебу", callback_data='smart_end')
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
