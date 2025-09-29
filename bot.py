@@ -70,23 +70,23 @@ class SleepTrackerBot:
             logger.error(f"❌ Ошибка сохранения: {e}")
             return None
         
-        def get_user_events(self, user_id):
-            """Получение всех событий пользователя"""
-            try:
-                if not os.path.exists(self.data_file):
-                    return []
-                    
-                with open(self.data_file, 'r', encoding='utf-8') as f:
-                    events = json.load(f)
-                
-                user_events = [e for e in events if e['user_id'] == user_id]
-                user_events.sort(key=lambda x: x['timestamp'])
-                
-                return [(e['event_type'], e['timestamp']) for e in user_events]
-                
-            except Exception as e:
-                logger.error(f"❌ Ошибка получения событий: {e}")
+    def get_user_events(self, user_id):
+        """Получение всех событий пользователя"""
+        try:
+            if not os.path.exists(self.data_file):
                 return []
+                
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                events = json.load(f)
+            
+            user_events = [e for e in events if e['user_id'] == user_id]
+            user_events.sort(key=lambda x: x['timestamp'])
+            
+            return [(e['event_type'], e['timestamp']) for e in user_events]
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения событий: {e}")
+            return []
     
     def get_week_events(self, user_id):
         """Получение событий за последние 7 дней"""
