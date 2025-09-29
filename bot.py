@@ -25,17 +25,6 @@ EVENT_TYPES = {
     'workout_end': "✅ Закончила тренировку"
 }
 
-# Символы для графиков
-GRAPH_SYMBOLS = {
-    'sleep': '😴',
-    'wake_up': '🌅', 
-    'breakfast': '🍳',
-    'lunch': '🍲',
-    'dinner': '🍽️',
-    'workout_start': '💪',
-    'workout_end': '✅'
-}
-
 class SleepTrackerBot:
     def __init__(self):
         self.data_file = 'events_data.json'
@@ -130,7 +119,7 @@ class SleepTrackerBot:
             for event_type, timestamp_str in week_events:
                 event_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 day_key = event_time.strftime('%Y-%m-%d')
-                day_name = event_time.strftime('%a')  # Сокр. название дня
+                day_name = event_time.strftime('%a')
                 
                 if day_key not in days_events:
                     days_events[day_key] = {'name': day_name, 'events': []}
@@ -144,26 +133,23 @@ class SleepTrackerBot:
             # Создаем график
             chart = "📊 АКТИВНОСТЬ ЗА НЕДЕЛЮ:\n\n"
             
-            for day_key, day_data in sorted_days[-7:]:  # Последние 7 дней
+            for day_key, day_data in sorted_days[-7:]:
                 date_obj = datetime.strptime(day_key, '%Y-%m-%d')
                 date_str = date_obj.strftime('%d.%m')
                 
                 chart += f"📅 {date_str} ({day_data['name']}):\n"
                 
                 if day_data['events']:
-                    # Сортируем события по времени
                     day_data['events'].sort()
                     
                     for time_str, event_type in day_data['events']:
-                        symbol = GRAPH_SYMBOLS.get(event_type, '•')
                         name = EVENT_TYPES.get(event_type, 'Событие')
-                        chart += f"   {symbol} {time_str} - {name}\n"
+                        chart += f"   • {time_str} - {name}\n"
                 else:
                     chart += "   ─── событий не было ───\n"
                 
                 chart += "\n"
             
-            # Статистика
             total_events = len(week_events)
             unique_days = len(days_events)
             chart += f"📈 ИТОГО: {total_events} событий за {unique_days} дней"
@@ -197,7 +183,6 @@ class SleepTrackerBot:
             
             for hour in range(24):
                 count = hourly_count[hour]
-                # Создаем строку графика
                 bar_length = int((count / max_count) * 10) if max_count > 0 else 0
                 bar = '█' * bar_length
                 
@@ -215,32 +200,34 @@ class SleepTrackerBot:
             logger.error(f"❌ Ошибка создания часового графика: {e}")
             return "❌ Ошибка при создании графика"
     
-    def export_to_csv(self, user_id):
-        """Экспорт событий в CSV"""
+    def create_csv_file(self, user_id):
+        """Создание временного CSV файла"""
         try:
             events = self.get_user_events(user_id)
             
-            # Создаем CSV в памяти как строку
-            output = StringIO()
-            writer = csv.writer(output)
+            if not events:
+                return None
             
-            # Заголовки
-            writer.writerow(['Тип события', 'Время', 'Описание'])
+            # Создаем временный файл
+            filename = f'temp_events_{user_id}.csv'
             
-            # Данные
-            for event_type, timestamp in events:
-                description = EVENT_TYPES.get(event_type, 'Неизвестно')
-                writer.writerow([event_type, timestamp, description])
+            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Заголовки
+                writer.writerow(['Тип события', 'Время', 'Описание'])
+                
+                # Данные
+                for event_type, timestamp in events:
+                    description = EVENT_TYPES.get(event_type, 'Неизвестно')
+                    writer.writerow([event_type, timestamp, description])
             
-            # Возвращаем строку (не bytes!)
-            csv_string = output.getvalue()
-            output.close()
-            
-            return csv_string
+            logger.info(f"✅ CSV файл создан: {filename}")
+            return filename
             
         except Exception as e:
-            logger.error(f"❌ Ошибка экспорта CSV: {e}")
-            return ""
+            logger.error(f"❌ Ошибка создания CSV файла: {e}")
+            return None
 
 # Создаем экземпляр трекера
 tracker = SleepTrackerBot()
@@ -292,7 +279,6 @@ def stats_command(update, context):
         user_id = update.effective_user.id
         chart = tracker.create_week_chart(user_id)
         
-        # Разбиваем на части если слишком длинное сообщение
         if len(chart) > 4000:
             parts = [chart[i:i+4000] for i in range(0, len(chart), 4000)]
             for part in parts:
@@ -322,24 +308,31 @@ def csv_command(update, context):
     """Обработчик команды /csv - экспорт в CSV"""
     try:
         user_id = update.effective_user.id
-        events = tracker.get_user_events(user_id)
         
-        if not events:
+        # Создаем CSV файл на диске
+        csv_filename = tracker.create_csv_file(user_id)
+        
+        if not csv_filename:
             update.message.reply_text("📝 У вас еще нет записанных событий.")
             return
         
-        csv_data = tracker.export_to_csv(user_id)
-        
-        if csv_data:
-            # Кодируем в bytes только при отправке
+        # Отправляем файл
+        with open(csv_filename, 'rb') as csv_file:
             update.message.reply_document(
-                document=('events.csv', csv_data.encode('utf-8')),
+                document=csv_file,
+                filename='events.csv',
                 caption="📊 Ваши данные в CSV формате"
             )
-            logger.info(f"✅ Пользователь {user_id} экспортировал CSV")
-        else:
-            update.message.reply_text("❌ Ошибка при создании CSV файла")
+        
+        # Удаляем временный файл
+        try:
+            os.remove(csv_filename)
+            logger.info(f"✅ Временный файл удален: {csv_filename}")
+        except:
+            pass
             
+        logger.info(f"✅ Пользователь {user_id} экспортировал CSV")
+        
     except Exception as e:
         logger.error(f"❌ Ошибка в csv_command: {e}")
         update.message.reply_text("❌ Ошибка при экспорте данных")
