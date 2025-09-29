@@ -11,7 +11,6 @@ def start(update, context):
 
 def main():
     # Твой токен бота
-    TOKEN = "7578614408:AAH2vKc9k0Y7q8vx1s7v8v8N9tN9tN9tN9t"
     
     # Создаем бота
     updater = Updater(TOKEN, use_context=True)
